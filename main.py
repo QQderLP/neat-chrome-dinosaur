@@ -6,6 +6,7 @@ import sys
 import neat
 
 pygame.init()
+generation_scores = []  # 放在程式最前面
 
 # Global Constants
 SCREEN_HEIGHT = 600
@@ -23,6 +24,12 @@ SMALL_CACTUS = [pygame.image.load(os.path.join("Assets/Cactus", "SmallCactus1.pn
 LARGE_CACTUS = [pygame.image.load(os.path.join("Assets/Cactus", "LargeCactus1.png")),
                 pygame.image.load(os.path.join("Assets/Cactus", "LargeCactus2.png")),
                 pygame.image.load(os.path.join("Assets/Cactus", "LargeCactus3.png"))]
+DUCKING = [pygame.image.load(os.path.join("Assets/Dino", "DinoDuck1.png")),
+           pygame.image.load(os.path.join("Assets/Dino", "DinoDuck2.png"))]
+
+
+BIRD =[pygame.image.load(os.path.join("Assets/Bird", "Bird1.png")),
+           pygame.image.load(os.path.join("Assets/Bird", "Bird2.png"))]
 
 BG = pygame.image.load(os.path.join("Assets/Other", "Track.png"))
 
@@ -32,10 +39,13 @@ FONT = pygame.font.Font('freesansbold.ttf', 20)
 class Dinosaur:
     X_POS = 80
     Y_POS = 310
+    Y_POS_DUCK = 340
     JUMP_VEL = 8.5
 
     def __init__(self, img=RUNNING[0]):
         self.image = img
+        self.duck_img = DUCKING
+        self.dino_duck = False
         self.dino_run = True
         self.dino_jump = False
         self.jump_vel = self.JUMP_VEL
@@ -44,10 +54,15 @@ class Dinosaur:
         self.step_index = 0
 
     def update(self):
-        if self.dino_run:
-            self.run()
         if self.dino_jump:
             self.jump()
+        elif self.dino_duck:
+            self.rect.y = self.Y_POS_DUCK
+            self.duck()
+        else:
+            self.rect.y = self.Y_POS
+            self.run()
+
         if self.step_index >= 10:
             self.step_index = 0
 
@@ -61,10 +76,12 @@ class Dinosaur:
             self.dino_run = True
             self.jump_vel = self.JUMP_VEL
 
+    def duck(self):
+        self.image = self.duck_img[self.step_index // 5]
+        self.step_index += 1
+
     def run(self):
         self.image = RUNNING[self.step_index // 5]
-        self.rect.x = self.X_POS
-        self.rect.y = self.Y_POS
         self.step_index += 1
 
     def draw(self, SCREEN):
@@ -101,7 +118,18 @@ class LargeCactus(Obstacle):
         super().__init__(image, number_of_cacti)
         self.rect.y = 300
 
+class Bird(Obstacle):
+    def __init__(self, image):
+        self.type = 0
+        super().__init__(image, self.type)
+        self.rect.y = random.choice([250, 270, 300])
+        self.index = 0
 
+    def draw(self, SCREEN):
+        if self.index >= 9:
+            self.index = 0
+        SCREEN.blit(self.image[self.index//5], self.rect)
+        self.index += 1
 def remove(index):
     dinosaurs.pop(index)
     ge.pop(index)
@@ -136,15 +164,20 @@ def eval_genomes(genomes, config):
         genome.fitness = 0
 
     def score():
-        global points, game_speed
+        global points, game_speed, run
         points += 1
         if points % 100 == 0:
-            game_speed += 1
+            game_speed = min(game_speed + 1, 40)  # 加入最大速度限制
         text = FONT.render(f'Points:  {str(points)}', True, (0, 0, 0))
         SCREEN.blit(text, (950, 50))
 
+        # 當達到3000分，關閉程式
+        if points >= 2500:
+            print("目標達成：3000分，關閉程式。")
+            pygame.quit()
+            sys.exit()
+
     def statistics():
-        global dinosaurs, game_speed, ge
         text_1 = FONT.render(f'Dinosaurs Alive:  {str(len(dinosaurs))}', True, (0, 0, 0))
         text_2 = FONT.render(f'Generation:  {pop.generation+1}', True, (0, 0, 0))
         text_3 = FONT.render(f'Game Speed:  {str(game_speed)}', True, (0, 0, 0))
@@ -171,20 +204,50 @@ def eval_genomes(genomes, config):
 
         SCREEN.fill((255, 255, 255))
 
-        for dinosaur in dinosaurs:
-            dinosaur.update()
-            dinosaur.draw(SCREEN)
-
-        if len(dinosaurs) == 0:
-            break
-
         if len(obstacles) == 0:
-            rand_int = random.randint(0, 1)
+            rand_int = random.randint(0, 2)
             if rand_int == 0:
                 obstacles.append(SmallCactus(SMALL_CACTUS, random.randint(0, 2)))
             elif rand_int == 1:
                 obstacles.append(LargeCactus(LARGE_CACTUS, random.randint(0, 2)))
+            else:
+                obstacles.append(Bird(BIRD))
 
+        # 對每隻恐龍做行為決策
+        for i, dinosaur in enumerate(dinosaurs):
+            dinosaur.update()
+            dinosaur.draw(SCREEN)
+            ge[i].fitness += 0.1
+
+            if len(obstacles) > 0:
+                obstacle = obstacles[0]
+                dx = obstacle.rect.x - dinosaur.rect.x
+                obstacle_type = 0 if isinstance(obstacle, SmallCactus) else (
+                    1 if isinstance(obstacle, LargeCactus) else 2)
+
+                inputs = (
+                    dinosaur.rect.y,
+                    dx,
+                    obstacle_type,
+                    obstacle.rect.y,
+                    obstacle.rect.width,
+                    game_speed
+                )
+
+                output = nets[i].activate(inputs)
+
+                if output[0] > 0.5 and dinosaur.rect.y == dinosaur.Y_POS:  # 跳躍
+                    dinosaur.dino_jump = True
+                    dinosaur.dino_run = False
+                    dinosaur.dino_duck = False
+                elif output[1] > 0.5 and not dinosaur.dino_jump:  # 蹲下
+                    dinosaur.dino_duck = True
+                    dinosaur.dino_run = False
+                else:
+                    dinosaur.dino_duck = False
+                    dinosaur.dino_run = True
+
+        # 移動與繪製障礙物
         for obstacle in obstacles:
             obstacle.draw(SCREEN)
             obstacle.update()
@@ -192,20 +255,64 @@ def eval_genomes(genomes, config):
                 if dinosaur.rect.colliderect(obstacle.rect):
                     ge[i].fitness -= 1
                     remove(i)
-
-        for i, dinosaur in enumerate(dinosaurs):
-            output = nets[i].activate((dinosaur.rect.y,
-                                       distance((dinosaur.rect.x, dinosaur.rect.y),
-                                        obstacle.rect.midtop)))
-            if output[0] > 0.5 and dinosaur.rect.y == dinosaur.Y_POS:
-                dinosaur.dino_jump = True
-                dinosaur.dino_run = False
+            # 只需要檢查第一個障礙物即可
+            break
 
         statistics()
         score()
         background()
         clock.tick(30)
         pygame.display.update()
+
+        if len(dinosaurs) == 0:
+            run = False
+
+            # 統計這一代的分數並即時畫圖
+            scores = [genome.fitness for genome_id, genome in genomes]
+            max_score = max(scores)
+            avg_score = sum(scores) / len(scores)
+            generation_scores.append((max_score, avg_score))
+            print(f"Generation done. Max: {max_score}, Avg: {avg_score}")
+            import visualize
+            import pickle
+
+            # 儲存最佳 genome
+            winner = max(genomes, key=lambda g: g[1].fitness)[1]
+            with open("best_genome.pkl", "wb") as f:
+                pickle.dump(winner, f)
+
+            # 畫出神經網路
+            node_names = {
+                -1: "Y",
+                -2: "dx",
+                -3: "Type",
+                -4: "obsY",
+                -5: "obsW",
+                -6: "Speed",
+                0: "Jump",
+                1: "Duck"
+            }
+
+            visualize.draw_net(config, winner, view=True, node_names=node_names)
+
+            # 畫圖
+            import matplotlib.pyplot as plt
+
+            max_scores = [score[0] for score in generation_scores]
+            avg_scores = [score[1] for score in generation_scores]
+            generations = list(range(1, len(generation_scores) + 1))
+
+            plt.plot(generations, max_scores, label='Max Score', color='blue', marker='o')
+            plt.plot(generations, avg_scores, label='Avg Score', color='orange', marker='x')
+
+            plt.xlabel('Generation')
+            plt.ylabel('Score')
+            plt.title('NEAT AI Learning Progress')
+            plt.grid(True)
+            plt.legend()
+            plt.savefig('neat_progress.png')
+            plt.show(block=False)
+# 畫出神經網路結構圖
 
 
 # Setup the NEAT Neural Network
@@ -220,8 +327,21 @@ def run(config_path):
     )
 
     pop = neat.Population(config)
-    pop.run(eval_genomes, 50)
+    pop.run(eval_genomes)
 
+import subprocess
+
+def auto_git_command():
+    try:
+        # 設定 Git 自動執行指令，這裡假設你的 Git 指令已經正確設置
+        subprocess.run(['git', 'add', '--all'], check=True)
+        subprocess.run(['git', 'commit', '-m', '"Automatic commit"'], check=True)
+        subprocess.run(['git', 'push'], check=True)
+        print("Git 操作已自動執行")
+    except subprocess.CalledProcessError as e:
+        print(f"Git 命令執行失敗：{e}")
+
+auto_git_command()
 
 if __name__ == '__main__':
     local_dir = os.path.dirname(__file__)
