@@ -275,6 +275,7 @@ def eval_genomes(genomes, config):
             print(f"Generation done. Max: {max_score}, Avg: {avg_score}")
             import visualize
             import pickle
+            import os
 
             # 儲存最佳 genome
             winner = max(genomes, key=lambda g: g[1].fitness)[1]
@@ -293,7 +294,19 @@ def eval_genomes(genomes, config):
                 1: "Duck"
             }
 
-            visualize.draw_net(config, winner, view=True, node_names=node_names)
+            # 建立圖檔資料夾
+            output_dir = "networks"
+            os.makedirs(output_dir, exist_ok=True)
+
+            # 自動編號：找出目前最大檔名數字
+            existing_files = [f for f in os.listdir(output_dir) if f.startswith("network_") and f.endswith(".png")]
+            numbers = [int(f.split("_")[1].split(".")[0]) for f in existing_files if
+                       f.split("_")[1].split(".")[0].isdigit()]
+            next_num = max(numbers) + 1 if numbers else 1
+            filename = os.path.join(output_dir, f"network_{next_num}")
+
+            # 畫圖（儲存圖檔但不打開）
+            visualize.draw_net(config, winner, filename=filename, view=False, node_names=node_names)
 
             # 畫圖
             import matplotlib.pyplot as plt
