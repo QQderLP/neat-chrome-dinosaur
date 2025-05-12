@@ -302,8 +302,8 @@ def eval_genomes(genomes, config):
             avg_scores = [score[1] for score in generation_scores]
             generations = list(range(1, len(generation_scores) + 1))
 
-            plt.plot(generations, max_scores, label='Max Score', color='blue', marker='o')
-            plt.plot(generations, avg_scores, label='Avg Score', color='orange', marker='x')
+            plt.plot(generations, max_scores, label='', color='blue', marker='o')
+            plt.plot(generations, avg_scores, label='', color='orange', marker='x')
 
             plt.xlabel('Generation')
             plt.ylabel('Score')
