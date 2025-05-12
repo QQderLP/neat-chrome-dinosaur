@@ -172,7 +172,7 @@ def eval_genomes(genomes, config):
         SCREEN.blit(text, (950, 50))
 
         # 當達到3000分，關閉程式
-        if points >= 2500:
+        if points >= 10000:
             print("目標達成：3000分，關閉程式。")
             pygame.quit()
             sys.exit()
