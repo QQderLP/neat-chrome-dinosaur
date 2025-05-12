@@ -255,7 +255,7 @@ def eval_genomes(genomes, config):
                 if dinosaur.rect.colliderect(obstacle.rect):
                     ge[i].fitness -= 1
                     remove(i)
-            # 只需要檢查第一個障礙物即可
+
             break
 
         statistics()
@@ -267,7 +267,7 @@ def eval_genomes(genomes, config):
         if len(dinosaurs) == 0:
             run = False
 
-            # 統計這一代的分數並即時畫圖
+
             scores = [genome.fitness for genome_id, genome in genomes]
             max_score = max(scores)
             avg_score = sum(scores) / len(scores)
@@ -305,10 +305,10 @@ def eval_genomes(genomes, config):
             next_num = max(numbers) + 1 if numbers else 1
             filename = os.path.join(output_dir, f"network_{next_num}")
 
-            # 畫圖（儲存圖檔但不打開）
+
             visualize.draw_net(config, winner, filename=filename, view=False, node_names=node_names)
 
-            # 畫圖
+
             import matplotlib.pyplot as plt
 
             max_scores = [score[0] for score in generation_scores]
@@ -325,7 +325,7 @@ def eval_genomes(genomes, config):
             plt.legend()
             plt.savefig('neat_progress.png')
             plt.show(block=False)
-# 畫出神經網路結構圖
+
 
 
 # Setup the NEAT Neural Network
