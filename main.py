@@ -167,7 +167,7 @@ def eval_genomes(genomes, config):
         global points, game_speed, run
         points += 1
         if points % 100 == 0:
-            game_speed = min(game_speed + 1, 40)  # 加入最大速度限制
+            game_speed = min(game_speed + 1, 1000)  # 加入最大速度限制
         text = FONT.render(f'Points:  {str(points)}', True, (0, 0, 0))
         SCREEN.blit(text, (950, 50))
 
